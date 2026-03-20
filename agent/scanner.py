@@ -158,13 +158,14 @@ def run_slither(repo_path: str, sol_files: List[str]) -> Dict:
         }
 
 
-def scan_repository(repo_url: str, branch: str = "main") -> Dict:
+def scan_repository(repo_url: str, branch: str = "main", keep_repo: bool = False) -> Dict:
     """
     Full scan pipeline: clone repo, find .sol files, run Slither.
     
     Args:
         repo_url: HTTPS URL of the repository
         branch: Branch to checkout
+        keep_repo: If True, don't delete the repo after scanning (for secret scanning)
         
     Returns:
         Dict with scan results and metadata
@@ -184,11 +185,27 @@ def scan_repository(repo_url: str, branch: str = "main") -> Dict:
                 "error": "No Solidity files found in repository",
                 "repo_url": repo_url,
                 "files_scanned": 0,
-                "results": []
+                "results": [],
+                "secrets": [],
+                "has_secrets": False
             }
         
         # Run Slither
         slither_results = run_slither(repo_path, sol_files)
+        
+        # Run Secret Scanner
+        secret_findings = []
+        secret_severity = None
+        try:
+            from agent.secret_scanner import scan_secrets
+            secret_findings = scan_secrets(repo_path)
+            if secret_findings:
+                # Determine max severity
+                severities = {'CRITICAL': 3, 'HIGH': 2, 'MEDIUM': 1}
+                max_sev = max(secret_findings, key=lambda x: severities.get(x['severity'], 0))
+                secret_severity = max_sev['severity']
+        except Exception as e:
+            logger.warning(f"Secret scan failed: {e}")
         
         return {
             "success": slither_results.get("success", False),
@@ -198,7 +215,10 @@ def scan_repository(repo_url: str, branch: str = "main") -> Dict:
             "results": slither_results.get("results", []),
             "error": slither_results.get("error"),
             "slither_stdout": slither_results.get("stdout"),
-            "slither_stderr": slither_results.get("stderr")
+            "slither_stderr": slither_results.get("stderr"),
+            "secrets": secret_findings,
+            "has_secrets": len(secret_findings) > 0,
+            "secret_severity": secret_severity
         }
         
     except Exception as e:
@@ -208,11 +228,13 @@ def scan_repository(repo_url: str, branch: str = "main") -> Dict:
             "error": str(e),
             "repo_url": repo_url,
             "files_scanned": 0,
-            "results": []
+            "results": [],
+            "secrets": [],
+            "has_secrets": False
         }
     finally:
-        # Cleanup cloned repo
-        if repo_path and os.path.exists(repo_path):
+        # Cleanup cloned repo (unless keep_repo is True)
+        if repo_path and os.path.exists(repo_path) and not keep_repo:
             try:
                 shutil.rmtree(repo_path)
                 logger.info(f"Cleaned up {repo_path}")

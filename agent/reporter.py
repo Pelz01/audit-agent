@@ -507,7 +507,7 @@ def report_findings(
 ) -> Optional[str]:
     """
     Main entry point for reporting findings.
-    Routes to PR flow for critical, issue flow otherwise.
+    Routes to PR flow for critical contract vulns, issue for secrets + non-critical.
     """
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -517,12 +517,30 @@ def report_findings(
     high_count = audit_report.high_count if hasattr(audit_report, 'high_count') else audit_report.severity_breakdown.get('high', 0)
     medium_count = audit_report.severity_breakdown.get('medium', 0) if hasattr(audit_report, 'severity_breakdown') else 0
     
+    # Check for secret findings
+    secret_critical = getattr(audit_report, 'secret_critical_count', 0) or 0
+    secret_high = getattr(audit_report, 'secret_high_count', 0) or 0
+    secret_findings = getattr(audit_report, 'secret_findings', []) or []
+    
+    has_secrets = secret_critical > 0 or secret_high > 0
+    secret_issue_url = None
+    
+    # File secret issue if secrets found (secrets get issue, not PR)
+    if has_secrets:
+        logger.info(f"Secret exposures detected for {repo_full_name}, filing urgent issue")
+        secret_issue_url = file_secret_issue(token, repo_full_name, audit_report, secret_findings)
+        if secret_issue_url:
+            logger.info(f"Secret issue filed: {secret_issue_url}")
+    
+    # Decision logic: PR for contract criticals, issue otherwise
     if critical_count > 0:
-        logger.info(f"Critical findings detected for {repo_full_name}")
+        logger.info(f"Critical contract findings detected for {repo_full_name}")
         return handle_critical(repo_full_name, audit_report, scan_findings or {})
-    elif high_count > 0 or medium_count > 0:
+    elif high_count > 0 or medium_count > 0 or (has_secrets and not critical_count):
         logger.info(f"Non-critical findings for {repo_full_name}, filing issue")
         return handle_non_critical(repo_full_name, audit_report)
+    elif has_secrets:
+        return secret_issue_url
     else:
         logger.info(f"No significant findings for {repo_full_name}")
         return None
@@ -535,3 +553,58 @@ report = report_findings
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     print("Reporter module loaded.")
+
+
+def file_secret_issue(
+    token: str,
+    repo_name: str,
+    report,
+    secret_findings: List[Dict]
+) -> Optional[str]:
+    """File a GitHub issue for secret exposures."""
+    from github import Github
+    
+    g = Github(token)
+    
+    try:
+        repo = g.get_repo(repo_name)
+        
+        # Build secret findings table
+        secrets_table = "| Severity | Type | File | Line |\n|----------|------|------|------|\n"
+        for s in secret_findings:
+            severity = s.get("severity", "UNKNOWN")
+            title = s.get("title", "Unknown")
+            file = s.get("file", "unknown")
+            line = s.get("line", 0)
+            secrets_table += f"| 🚨 {severity} | {title} | `{file}` | {line} |\n"
+        
+        body = f"""## 🚨 URGENT — Secrets Detected in Repository
+
+**Immediate action required.** Exposed credentials were found in this repository.
+Rotating keys should be done within the next hour if the repository is public.
+
+### ⚡ Immediate Steps
+1. **Rotate all exposed credentials NOW** — assume they are already compromised
+2. **Remove secrets from git history** using [BFG Repo Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) or `git filter-repo`
+3. **Add `.env` to `.gitignore`** if not already present
+4. **Enable GitHub Secret Scanning** in your repository settings
+
+### Exposed Secrets Found
+
+{secrets_table}
+---
+> 🤖 Scanned by [AuditAgent](https://github.com/Pelz01/audit-agent)
+"""
+        
+        issue = repo.create_issue(
+            title=f"[AuditAgent] 🚨 URGENT: Secrets Exposed in {repo_name.split('/')[1]}",
+            body=body,
+            labels=["security", "urgent", "secrets"]
+        )
+        
+        logger.info(f"Created secret issue #{issue.number} for {repo_name}")
+        return issue.html_url
+        
+    except Exception as e:
+        logger.error(f"Failed to create secret issue: {e}")
+        return None

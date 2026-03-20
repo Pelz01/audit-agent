@@ -139,7 +139,7 @@ class AuditAgent:
                     
                     # Step 3: Interpret
                     log_broadcast("[INTERPRET] Sending findings to Claude...")
-                    report = interpret_results(scan_results, repo_name)
+                    report = interpret_results(scan_results, repo_name, scan_results.get("secrets", []))
                     
                     critical = report.critical_count
                     high = report.high_count

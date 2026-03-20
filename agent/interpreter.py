@@ -29,6 +29,7 @@ Your output must be a structured JSON report with the following fields:
 - timestamp: ISO timestamp of the audit
 - summary: Brief summary of findings
 - severity_breakdown: {critical: count, high: count, medium: count, low: count, informational: count}
+- secret_severity_breakdown: {critical: count, high: count, medium: count} for secret findings
 - findings: Array of detailed findings, each with:
   - title: Short descriptive title
   - severity: critical/high/medium/low/informational
@@ -36,6 +37,14 @@ Your output must be a structured JSON report with the following fields:
   - impact: Potential impact if exploited
   - location: File and line number if available
   - recommendation: How to fix (if applicable)
+- secret_findings: Array of secret exposure findings, each with:
+  - title: Short descriptive title
+  - severity: CRITICAL/HIGH/MEDIUM
+  - file: File where secret was found
+  - line: Line number (or 0 for whole-file)
+  - description: What was exposed
+  - evidence: Redacted evidence (first 4 + last 4 chars)
+  - recommendation: Remediation steps
 
 Be thorough but concise. Only output valid JSON, no additional text."""
 
@@ -60,6 +69,8 @@ class AuditReport:
     summary: str
     severity_breakdown: Dict[str, int]
     findings: List[Dict]
+    secret_severity_breakdown: Dict[str, int] = None
+    secret_findings: List[Dict] = None
     
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -74,8 +85,32 @@ class AuditReport:
         return self.severity_breakdown.get("high", 0)
     
     @property
+    def medium_count(self) -> int:
+        return self.severity_breakdown.get("medium", 0)
+    
+    @property
+    def low_count(self) -> int:
+        return self.severity_breakdown.get("low", 0)
+    
+    @property
+    def secret_critical_count(self) -> int:
+        return (self.secret_severity_breakdown or {}).get("critical", 0)
+    
+    @property
+    def secret_high_count(self) -> int:
+        return (self.secret_severity_breakdown or {}).get("high", 0)
+    
+    @property
+    def secret_medium_count(self) -> int:
+        return (self.secret_severity_breakdown or {}).get("medium", 0)
+    
+    @property
     def has_critical_or_high(self) -> bool:
         return self.critical_count > 0 or self.high_count > 0
+    
+    @property
+    def has_secrets(self) -> bool:
+        return self.secret_critical_count > 0 or self.secret_high_count > 0
 
 
 def generate_audit_hash(repo_name: str, timestamp: str, findings: List) -> str:
@@ -84,7 +119,7 @@ def generate_audit_hash(repo_name: str, timestamp: str, findings: List) -> str:
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
-def call_claude_api(slither_results: Dict, repo_name: str, api_key: str) -> AuditReport:
+def call_claude_api(slither_results: Dict, repo_name: str, api_key: str, secret_findings: List = None) -> AuditReport:
     """
     Send Slither results to Claude API for interpretation.
     
@@ -92,6 +127,7 @@ def call_claude_api(slither_results: Dict, repo_name: str, api_key: str) -> Audi
         slither_results: Raw Slither JSON output
         repo_name: Name of the repository
         api_key: Anthropic API key
+        secret_findings: List of secret scanner findings
         
     Returns:
         Structured AuditReport
@@ -103,13 +139,25 @@ def call_claude_api(slither_results: Dict, repo_name: str, api_key: str) -> Audi
     
     timestamp = datetime.utcnow().isoformat() + "Z"
     
-    # Prepare the user message with Slither results
+    # Build the user message
     user_message = f"""Analyze the following Slither static analysis results for repository: {repo_name}
 
 Slither Results:
 {json.dumps(slither_results, indent=2)}
+"""
+    
+    # Add secret findings if present
+    if secret_findings:
+        user_message += f"""
 
-Provide a structured security audit report in JSON format."""
+Additionally, the following secret exposure findings were detected in non-contract files:
+
+{json.dumps(secret_findings, indent=2)}
+
+Include these in your report under a separate "Secret Exposures" section. Treat CRITICAL secret findings with the same urgency as CRITICAL smart contract vulnerabilities. These require immediate action.
+"""
+
+    user_message += "\n\nProvide a structured security audit report in JSON format."
 
     logger.info(f"Sending {len(slither_results.get('results', []))} findings to Claude API")
     
@@ -173,13 +221,14 @@ Provide a structured security audit report in JSON format."""
         )
 
 
-def interpret_results(slither_results: Dict, repo_name: str) -> AuditReport:
+def interpret_results(slither_results: Dict, repo_name: str, secret_findings: List = None) -> AuditReport:
     """
     Interpret Slither results using Claude API.
     
     Args:
         slither_results: Raw Slither JSON output
         repo_name: Name of the repository
+        secret_findings: List of secret scanner findings
         
     Returns:
         Structured AuditReport
@@ -189,7 +238,7 @@ def interpret_results(slither_results: Dict, repo_name: str) -> AuditReport:
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY environment variable not set")
     
-    return call_claude_api(slither_results, repo_name, api_key)
+    return call_claude_api(slither_results, repo_name, api_key, secret_findings)
 
 
 if __name__ == "__main__":
