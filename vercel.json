@@ -1,0 +1,20 @@
+{
+  "builds": [
+    {
+      "src": "api/server.py",
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.11"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/server.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "."
+  }
+}
