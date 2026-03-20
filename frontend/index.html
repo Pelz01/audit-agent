@@ -11,6 +11,7 @@
             background: #0d1117; 
             color: #e6edf3; 
             min-height: 100vh;
+            padding-bottom: 350px;
         }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         
@@ -24,16 +25,80 @@
         }
         h1 { font-size: 1.8rem; font-weight: 600; }
         .logo { color: #58a6ff; }
-        .refresh-indicator { 
-            font-size: 0.85rem; 
-            color: #8b949e; 
+        .refresh-indicator { font-size: 0.85rem; color: #8b949e; }
+        
+        /* Submission Bar */
+        .submission-bar {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .submission-bar input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+            background: #0d1117;
+            color: #e6edf3;
+            font-size: 0.95rem;
+        }
+        .submission-bar input:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+        .submission-bar button {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            background: #238636;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .submission-bar button:hover:not(:disabled) { background: #2ea043; }
+        .submission-bar button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
         }
         
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            animation: slideIn 0.3s ease;
+            max-width: 350px;
+        }
+        .toast-success { background: #238636; color: #fff; }
+        .toast-error { background: #da3633; color: #fff; }
+        .toast-warning { background: #d29922; color: #000; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Stats Bar */
         .stats-bar {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 20px;
-            margin-bottom: 40px;
+            margin-bottom: 30px;
         }
         .stat-card {
             background: #161b22;
@@ -42,16 +107,8 @@
             padding: 24px;
             text-align: center;
         }
-        .stat-value { 
-            font-size: 2.5rem; 
-            font-weight: 700;
-            color: #58a6ff;
-        }
-        .stat-label { 
-            font-size: 0.9rem; 
-            color: #8b949e; 
-            margin-top: 8px;
-        }
+        .stat-value { font-size: 2.5rem; font-weight: 700; color: #58a6ff; }
+        .stat-label { font-size: 0.9rem; color: #8b949e; margin-top: 8px; }
         
         .section-title {
             font-size: 1.3rem;
@@ -59,6 +116,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+        
+        .search-input {
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            background: #0d1117;
+            color: #e6edf3;
+            font-size: 0.85rem;
+            width: 250px;
         }
         
         .audits-grid {
@@ -72,6 +139,7 @@
             border: 1px solid #30363d;
             border-radius: 12px;
             padding: 20px;
+            cursor: pointer;
             transition: transform 0.2s, border-color 0.2s;
         }
         .audit-card:hover {
@@ -85,18 +153,8 @@
             align-items: flex-start;
             margin-bottom: 16px;
         }
-        .repo-name { 
-            font-size: 1.1rem; 
-            font-weight: 600;
-            color: #58a6ff;
-            word-break: break-all;
-        }
-        .audit-time { 
-            font-size: 0.8rem; 
-            color: #8b949e;
-            white-space: nowrap;
-            margin-left: 10px;
-        }
+        .repo-name { font-size: 1.1rem; font-weight: 600; color: #58a6ff; word-break: break-all; }
+        .audit-time { font-size: 0.8rem; color: #8b949e; white-space: nowrap; margin-left: 10px; }
         
         .severity-badges {
             display: flex;
@@ -116,11 +174,7 @@
         .badge-low { background: #3fb950; color: #fff; }
         .badge-info { background: #8b949e; color: #fff; }
         
-        .audit-links {
-            display: flex;
-            gap: 12px;
-            margin-top: 12px;
-        }
+        .audit-links { display: flex; gap: 12px; margin-top: 12px; }
         .link-btn {
             padding: 8px 16px;
             border-radius: 6px;
@@ -129,43 +183,198 @@
             font-weight: 500;
             transition: background 0.2s;
         }
-        .link-github {
-            background: #238636;
-            color: #fff;
-        }
+        .link-github { background: #238636; color: #fff; }
         .link-github:hover { background: #2ea043; }
-        .link-tx {
-            background: #1f6feb;
-            color: #fff;
-        }
+        .link-tx { background: #1f6feb; color: #fff; }
         .link-tx:hover { background: #388bfd; }
         
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #8b949e;
-        }
+        .empty-state { text-align: center; padding: 60px 20px; color: #8b949e; }
         .empty-icon { font-size: 3rem; margin-bottom: 16px; }
         
-        .loading {
-            display: flex;
-            justify-content: center;
-            padding: 40px;
-            color: #8b949e;
+        .loading { display: flex; justify-content: center; padding: 40px; color: #8b949e; }
+        
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            overflow-y: auto;
         }
+        .modal-overlay.active { display: block; }
+        .modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 16px;
+            max-width: 800px;
+            margin: 40px auto;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid #30363d;
+            position: sticky;
+            top: 0;
+            background: #161b22;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #8b949e;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        .modal-close:hover { color: #e6edf3; }
+        .modal-body { padding: 24px; }
+        
+        .modal-summary { margin-bottom: 24px; line-height: 1.6; color: #c9d1d9; }
+        
+        .modal-severity {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #0d1117;
+            border-radius: 8px;
+        }
+        
+        .finding-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .finding-header {
+            padding: 14px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .finding-header:hover { background: #1c2128; }
+        .finding-title { font-weight: 600; }
+        .finding-content {
+            padding: 0 16px 16px;
+            display: none;
+        }
+        .finding-card.expanded .finding-content { display: block; }
+        .finding-detail { margin-bottom: 12px; }
+        .finding-detail strong { color: #8b949e; }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #30363d;
+        }
+        
+        /* Terminal Panel */
+        .terminal-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #0d1117;
+            border-top: 1px solid #30363d;
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 1px solid #30363d;
+            background: #161b22;
+        }
+        .terminal-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .terminal-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .status-dot.live { background: #3fb950; }
+        .status-dot.disconnected { background: #da3633; }
+        
+        .terminal-clear {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            background: transparent;
+            color: #8b949e;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .terminal-clear:hover { background: #30363d; }
+        
+        .terminal-output {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+        .terminal-line { margin-bottom: 2px; }
+        
+        .log-discovery { color: #58a6ff; }
+        .log-scan { color: #d29922; }
+        .log-interpret { color: #a371f7; }
+        .log-report { color: #f0883e; }
+        .log-receipt { color: #3fb950; }
+        .log-done { color: #7ee787; font-weight: bold; }
+        .log-error { color: #da3633; }
+        .log-queued { color: #8b949e; }
         
         @media (max-width: 768px) {
             .stats-bar { grid-template-columns: repeat(2, 1fr); }
             .audits-grid { grid-template-columns: 1fr; }
+            body { padding-bottom: 380px; }
+            .submission-bar { flex-direction: column; }
+            .submission-bar button { width: 100%; }
         }
     </style>
 </head>
 <body>
+    <div class="toast-container" id="toastContainer"></div>
+    
     <div class="container">
         <header>
             <h1><span class="logo">🔍</span> AuditAgent</h1>
             <span class="refresh-indicator">Auto-refresh: 60s</span>
         </header>
+        
+        <!-- Submission Bar -->
+        <div class="submission-bar">
+            <input type="text" id="repoInput" placeholder="https://github.com/owner/repo..." />
+            <button id="auditBtn" onclick="submitAudit()">Audit Now →</button>
+        </div>
         
         <div class="stats-bar">
             <div class="stat-card">
@@ -188,6 +397,7 @@
         
         <div class="section-title">
             <span>Recent Audits</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search repos..." oninput="filterAudits()" />
         </div>
         
         <div id="auditsContainer">
@@ -195,14 +405,101 @@
         </div>
     </div>
 
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <h2 id="modalRepo" style="font-size: 1.3rem;"></h2>
+                    <span id="modalTime" style="color: #8b949e; font-size: 0.85rem;"></span>
+                </div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-summary" id="modalSummary"></div>
+                <div class="modal-severity" id="modalSeverity"></div>
+                <div id="modalFindings"></div>
+                <div class="modal-actions" id="modalActions"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Terminal Panel -->
+    <div class="terminal-panel">
+        <div class="terminal-header">
+            <div class="terminal-title">
+                <span>━━━ Live Agent Terminal ━━━</span>
+                <div class="terminal-status">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+            </div>
+            <button class="terminal-clear" onclick="clearTerminal()">Clear</button>
+        </div>
+        <div class="terminal-output" id="terminalOutput"></div>
+    </div>
+
     <script>
         const API_BASE = '';
+        let allAudits = [];
+        let ws = null;
+        let userScrolledUp = false;
         
+        // Toast notifications
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+        
+        // Submit audit
+        async function submitAudit() {
+            const input = document.getElementById('repoInput');
+            const btn = document.getElementById('auditBtn');
+            const repo = input.value.trim();
+            
+            if (!repo) {
+                showToast('Please enter a repository', 'error');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Queuing...';
+            
+            try {
+                const res = await fetch(`${API_BASE}/audit`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({repository: repo})
+                });
+                
+                const data = await res.json();
+                
+                if (res.status === 202) {
+                    showToast(`Audit queued for ${data.repository}. Watch the terminal below.`, 'success');
+                    input.value = '';
+                    document.getElementById('terminalOutput').scrollTop = document.getElementById('terminalOutput').scrollHeight;
+                } else if (res.status === 429) {
+                    showToast('Recently audited. Try again in a few minutes.', 'warning');
+                } else {
+                    showToast(data.detail || 'Failed to queue audit', 'error');
+                }
+            } catch (e) {
+                showToast('Failed to connect to API', 'error');
+            }
+            
+            btn.disabled = false;
+            btn.textContent = 'Audit Now →';
+        }
+        
+        // Fetch stats
         async function fetchStats() {
             try {
                 const res = await fetch(`${API_BASE}/stats`);
                 const stats = await res.json();
-                
                 document.getElementById('totalAudits').textContent = stats.total_audits || 0;
                 document.getElementById('totalVulns').textContent = stats.total_vulnerabilities || 0;
                 document.getElementById('issuesFiled').textContent = stats.issues_filed || 0;
@@ -212,78 +509,203 @@
             }
         }
         
+        // Fetch audits
         async function fetchAudits() {
             try {
-                const res = await fetch(`${API_BASE}/audits?page=1&page_size=20`);
+                const res = await fetch(`${API_BASE}/audits?page=1&page_size=50`);
                 const data = await res.json();
-                
-                const container = document.getElementById('auditsContainer');
-                
-                if (!data.audits || data.audits.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-icon">📋</div>
-                            <p>No audits yet. The agent is scanning repos...</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                container.innerHTML = `
-                    <div class="audits-grid">
-                        ${data.audits.map(audit => renderAuditCard(audit)).join('')}
-                    </div>
-                `;
+                allAudits = data.audits || [];
+                renderAudits(allAudits);
             } catch (e) {
                 console.error('Failed to fetch audits:', e);
-                document.getElementById('auditsContainer').innerHTML = `
-                    <div class="empty-state">
-                        <p>Failed to load audits. API may be unavailable.</p>
-                    </div>
-                `;
             }
         }
         
+        // Render audits
+        function renderAudits(audits) {
+            const container = document.getElementById('auditsContainer');
+            if (!audits.length) {
+                container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>No audits yet.</p></div>`;
+                return;
+            }
+            container.innerHTML = `<div class="audits-grid">${audits.map(a => renderAuditCard(a)).join('')}</div>`;
+        }
+        
+        // Filter audits
+        function filterAudits() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allAudits.filter(a => a.repo.toLowerCase().includes(query));
+            renderAudits(filtered);
+        }
+        
+        // Render audit card
         function renderAuditCard(audit) {
             const s = audit.severity_summary || {};
             const time = new Date(audit.timestamp).toLocaleString();
-            
             let badges = '';
             if (s.critical) badges += `<span class="badge badge-critical">${s.critical} Critical</span>`;
             if (s.high) badges += `<span class="badge badge-high">${s.high} High</span>`;
             if (s.medium) badges += `<span class="badge badge-medium">${s.medium} Medium</span>`;
             if (s.low) badges += `<span class="badge badge-low">${s.low} Low</span>`;
-            if (s.informational) badges += `<span class="badge badge-info">${s.informational} Info</span>`;
             if (!badges) badges = '<span class="badge badge-info">No issues</span>';
             
             let links = '';
-            if (audit.github_issue_url) {
-                links += `<a href="${audit.github_issue_url}" target="_blank" class="link-btn link-github">GitHub Issue</a>`;
-            }
-            if (audit.receipt_tx_hash) {
-                const baseScanUrl = `https://basescan.org/tx/${audit.receipt_tx_hash}`;
-                links += `<a href="${baseScanUrl}" target="_blank" class="link-btn link-tx">Receipt</a>`;
-            }
+            if (audit.github_issue_url) links += `<a href="${audit.github_issue_url}" target="_blank" class="link-btn link-github">GitHub Issue</a>`;
+            if (audit.receipt_tx_hash) links += `<a href="https://basescan.org/tx/${audit.receipt_tx_hash}" target="_blank" class="link-btn link-tx">Receipt</a>`;
             
-            return `
-                <div class="audit-card">
-                    <div class="audit-header">
-                        <span class="repo-name">${audit.repo}</span>
-                        <span class="audit-time">${time}</span>
-                    </div>
-                    <div class="severity-badges">${badges}</div>
-                    <div class="audit-links">${links}</div>
-                </div>
-            `;
+            return `<div class="audit-card" onclick="openAuditModal('${audit.id}')">
+                <div class="audit-header"><span class="repo-name">${audit.repo}</span><span class="audit-time">${time}</span></div>
+                <div class="severity-badges">${badges}</div>
+                <div class="audit-links">${links}</div>
+            </div>`;
         }
         
+        // Modal functions
+        async function openAuditModal(auditId) {
+            try {
+                const res = await fetch(`${API_BASE}/audits/${auditId}`);
+                const audit = await res.json();
+                
+                document.getElementById('modalRepo').textContent = audit.repo;
+                document.getElementById('modalTime').textContent = new Date(audit.timestamp).toLocaleString();
+                document.getElementById('modalSummary').textContent = audit.summary || 'No summary available.';
+                
+                const s = audit.severity_summary || {};
+                document.getElementById('modalSeverity').innerHTML = `
+                    ${s.critical ? `<span class="badge badge-critical">${s.critical} Critical</span>` : ''}
+                    ${s.high ? `<span class="badge badge-high">${s.high} High</span>` : ''}
+                    ${s.medium ? `<span class="badge badge-medium">${s.medium} Medium</span>` : ''}
+                    ${s.low ? `<span class="badge badge-low">${s.low} Low</span>` : ''}
+                `;
+                
+                const findings = audit.findings || [];
+                const findingsHtml = findings.map((f, i) => `
+                    <div class="finding-card" id="finding-${i}">
+                        <div class="finding-header" onclick="toggleFinding(${i})">
+                            <span class="finding-title">${getSeverityEmoji(f.severity)} ${f.severity?.toUpperCase() || 'UNKNOWN'} — ${f.title || 'Untitled'}</span>
+                            <span style="color: #8b949e;">▼</span>
+                        </div>
+                        <div class="finding-content">
+                            ${f.location ? `<div class="finding-detail"><strong>Location:</strong> ${f.location}</div>` : ''}
+                            ${f.description ? `<div class="finding-detail"><strong>Description:</strong> ${f.description}</div>` : ''}
+                            ${f.impact ? `<div class="finding-detail"><strong>Impact:</strong> ${f.impact}</div>` : ''}
+                            ${f.recommendation ? `<div class="finding-detail"><strong>Recommendation:</strong> ${f.recommendation}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('modalFindings').innerHTML = findingsHtml || '<p style="color: #8b949e;">No detailed findings.</p>';
+                
+                let actions = '';
+                if (audit.github_issue_url) actions += `<a href="${audit.github_issue_url}" target="_blank" class="link-btn link-github">View GitHub Issue ↗</a>`;
+                if (audit.receipt_tx_hash) actions += `<a href="https://basescan.org/tx/${audit.receipt_tx_hash}" target="_blank" class="link-btn link-tx">View Receipt ↗</a>`;
+                document.getElementById('modalActions').innerHTML = actions;
+                
+                document.getElementById('modalOverlay').classList.add('active');
+            } catch (e) {
+                showToast('Failed to load audit details', 'error');
+            }
+        }
+        
+        function getSeverityEmoji(severity) {
+            const s = severity?.toLowerCase();
+            if (s === 'critical') return '🚨';
+            if (s === 'high') return '⚠️';
+            if (s === 'medium') return '⚡';
+            if (s === 'low') return '📝';
+            return 'ℹ️';
+        }
+        
+        function toggleFinding(index) {
+            document.getElementById(`finding-${index}`).classList.toggle('expanded');
+        }
+        
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+        
+        function closeModalOutside(e) {
+            if (e.target.id === 'modalOverlay') closeModal();
+        }
+        
+        // Escape key closes modal
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+        
+        // WebSocket terminal
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/logs`;
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    document.getElementById('statusDot').className = 'status-dot live';
+                    document.getElementById('statusText').textContent = 'LIVE';
+                };
+                
+                ws.onmessage = (event) => {
+                    appendLog(event.data);
+                };
+                
+                ws.onclose = () => {
+                    document.getElementById('statusDot').className = 'status-dot disconnected';
+                    document.getElementById('statusText').textContent = 'DISCONNECTED';
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                ws.onerror = () => {
+                    document.getElementById('statusDot').className = 'status-dot disconnected';
+                    document.getElementById('statusText').textContent = 'DISCONNECTED';
+                };
+            } catch (e) {
+                setTimeout(connectWebSocket, 5000);
+            }
+        }
+        
+        function appendLog(line) {
+            const output = document.getElementById('terminalOutput');
+            const div = document.createElement('div');
+            div.className = 'terminal-line';
+            div.innerHTML = formatLog(line);
+            output.appendChild(div);
+            
+            if (!userScrolledUp) {
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+        
+        function formatLog(line) {
+            if (line.includes('[DISCOVERY]')) return `<span class="log-discovery">${line}</span>`;
+            if (line.includes('[SCAN]')) return `<span class="log-scan">${line}</span>`;
+            if (line.includes('[INTERPRET]')) return `<span class="log-interpret">${line}</span>`;
+            if (line.includes('[REPORT]')) return `<span class="log-report">${line}</span>`;
+            if (line.includes('[RECEIPT]')) return `<span class="log-receipt">${line}</span>`;
+            if (line.includes('[DONE]')) return `<span class="log-done">${line}</span>`;
+            if (line.includes('[ERROR]')) return `<span class="log-error">${line}</span>`;
+            if (line.includes('[QUEUED]')) return `<span class="log-queued">${line}</span>`;
+            return line;
+        }
+        
+        function clearTerminal() {
+            document.getElementById('terminalOutput').innerHTML = '';
+        }
+        
+        // Track if user scrolled up
+        document.getElementById('terminalOutput').addEventListener('scroll', function() {
+            const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 50;
+            userScrolledUp = !isAtBottom;
+        });
+        
+        // Initialize
         async function init() {
             await fetchStats();
             await fetchAudits();
+            connectWebSocket();
         }
         
-        // Auto-refresh every 60 seconds
         init();
+        
+        // Auto-refresh
         setInterval(() => {
             fetchStats();
             fetchAudits();

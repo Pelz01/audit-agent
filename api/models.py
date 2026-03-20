@@ -26,9 +26,10 @@ class AuditRecord(BaseModel):
     timestamp: str = Field(..., description="ISO timestamp of the audit")
     severity_summary: SeverityBreakdown = Field(default_factory=SeverityBreakdown)
     github_issue_url: Optional[str] = Field(None, description="URL of GitHub issue if filed")
+    pr_url: Optional[str] = Field(None, description="URL of PR if opened")
     receipt_tx_hash: Optional[str] = Field(None, description="On-chain receipt transaction hash")
-    slither_output: Optional[str] = Field(None, description="Raw Slither output (truncated)")
-    claude_report: Optional[str] = Field(None, description="Claude-generated report summary")
+    summary: Optional[str] = Field(None, description="Claude-generated report summary")
+    findings: List[Dict] = Field(default_factory=list, description="Detailed findings array")
     status: str = Field(default="completed", description="Audit status: pending, completed, failed")
 
 

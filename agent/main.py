@@ -1,5 +1,5 @@
 """
-Main orchestrator for AuditAgent.
+Main orchestrator for AuditAgent v2.
 Runs the full Discover→Scan→Interpret→Act→Receipt loop on a schedule.
 """
 import os
@@ -10,6 +10,7 @@ import schedule
 import time
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict
 
 # Configure logging
@@ -30,6 +31,12 @@ from agent.interpreter import interpret_results, AuditReport
 from agent.reporter import report_findings
 from agent.receipt import record_receipt
 
+# For saving audits
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from api.models import AuditRecord, SeverityBreakdown
+from api import storage
+
 
 class AuditAgent:
     """
@@ -46,17 +53,6 @@ class AuditAgent:
         max_results: int = 10,
         issue_threshold: int = 1
     ):
-        """
-        Initialize the AuditAgent.
-        
-        Args:
-            github_token: GitHub personal access token
-            anthropic_api_key: Anthropic API key for Claude
-            synthesis_api_key: Synthesis API key for ERC-8004 receipts
-            interval_hours: Hours between audit cycles
-            max_results: Max repos to audit per cycle
-            issue_threshold: Critical+High findings to file issue
-        """
         self.github_token = github_token
         self.anthropic_api_key = anthropic_api_key
         self.synthesis_api_key = synthesis_api_key
@@ -64,19 +60,18 @@ class AuditAgent:
         self.max_results = max_results
         self.issue_threshold = issue_threshold
         
-        # Set environment variables for submodules
         os.environ["GITHUB_TOKEN"] = github_token
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
         os.environ["SYNTHESIS_API_KEY"] = synthesis_api_key
         
         logger.info(f"AuditAgent initialized. Running every {interval_hours} hours.")
     
-    def run_audit_cycle(self) -> Dict:
+    def run_audit_cycle(self, repo_override: str = None) -> Dict:
         """
-        Run a single audit cycle: Discover → Scan → Interpret → Report → Receipt.
+        Run a single audit cycle.
         
-        Returns:
-            Dict with cycle results
+        Args:
+            repo_override: If provided, audit this specific repo instead of discovering
         """
         cycle_start = datetime.now()
         results = {
@@ -89,85 +84,91 @@ class AuditAgent:
             "errors": []
         }
         
-        logger.info("=" * 50)
-        logger.info("Starting new audit cycle")
-        logger.info("=" * 50)
+        log_broadcast("[DISCOVERY] Starting audit cycle...")
         
         try:
-            # Step 1: Discover new Solidity repositories
-            logger.info("[1/5] Discovering Solidity repositories...")
-            repos = discover_solidity_repos(
-                self.github_token,
-                max_results=self.max_results
-            )
+            # Step 1: Discover or use override
+            if repo_override:
+                log_broadcast(f"[DISCOVERY] On-demand audit requested: {repo_override}")
+                repos = [{"name": repo_override, "clone_url": f"https://github.com/{repo_override}.git", "default_branch": "main"}]
+            else:
+                log_broadcast("[DISCOVERY] Searching GitHub for Solidity repositories...")
+                repos = discover_solidity_repos(
+                    self.github_token,
+                    max_results=self.max_results
+                )
             
             if not repos:
-                logger.info("No new repositories discovered")
+                log_broadcast("[DISCOVERY] No repositories found")
                 results["repos_discovered"] = 0
                 return results
             
-            # Rank by stars/forks
             ranked_repos = rank_repos(repos)
             results["repos_discovered"] = len(ranked_repos)
-            logger.info(f"Discovered {len(ranked_repos)} repositories")
+            log_broadcast(f"[DISCOVERY] Found {len(ranked_repos)} candidate(s)")
             
             # Process each repository
             for repo in ranked_repos:
                 try:
-                    logger.info(f"\n--- Auditing {repo['name']} ---")
+                    repo_name = repo['name']
+                    log_broadcast(f"\n[SCAN] Auditing {repo_name}...")
                     
-                    # Step 2: Scan repository with Slither
-                    logger.info(f"[2/5] Scanning {repo['name']} with Slither...")
+                    # Step 2: Scan
+                    log_broadcast(f"[SCAN] Cloning {repo_name}...")
                     scan_results = scan_repository(
                         repo['clone_url'],
                         branch=repo.get('default_branch', 'main')
                     )
                     
                     if not scan_results.get("success"):
-                        logger.warning(f"Scan failed: {scan_results.get('error')}")
+                        log_broadcast(f"[ERROR] Scan failed: {scan_results.get('error')}")
                         results["errors"].append({
-                            "repo": repo['name'],
+                            "repo": repo_name,
                             "error": scan_results.get("error")
                         })
                         continue
                     
+                    finding_count = len(scan_results.get("results", []))
+                    log_broadcast(f"[SCAN] Slither complete: {finding_count} findings detected")
+                    
                     if not scan_results.get("results"):
-                        logger.info(f"No findings in {repo['name']}")
+                        log_broadcast(f"[SCAN] No findings in {repo_name}")
                         continue
                     
                     results["repos_scanned"] += 1
                     
-                    # Step 3: Interpret results with Claude
-                    logger.info(f"[3/5] Interpreting results with Claude...")
-                    report = interpret_results(
-                        scan_results,
-                        repo['name']
-                    )
+                    # Step 3: Interpret
+                    log_broadcast("[INTERPRET] Sending findings to Claude...")
+                    report = interpret_results(scan_results, repo_name)
                     
-                    logger.info(f"Found {len(report.findings)} issues "
-                                f"(Critical: {report.critical_count}, "
-                                f"High: {report.high_count})")
+                    critical = report.critical_count
+                    high = report.high_count
+                    medium = report.medium_count
+                    low = report.low_count
+                    
+                    log_broadcast(f"[INTERPRET] Report generated: {critical} Critical, {high} High, {medium} Medium, {low} Low")
                     
                     if report.has_critical_or_high:
                         results["repos_with_findings"] += 1
                         
-                        # Step 4: File GitHub issue if threshold met
-                        logger.info(f"[4/5] Checking issue threshold...")
+                        # Step 4: Report
+                        if critical > 0:
+                            log_broadcast("[REPORT] Critical findings detected — initiating PR flow")
+                        else:
+                            log_broadcast("[REPORT] High/Medium findings — filing issue")
+                        
                         issue_url = report_findings(
-                            self.github_token,
-                            repo['name'],
+                            repo_name,
                             report,
-                            threshold=self.issue_threshold
+                            scan_results
                         )
                         
                         if issue_url:
-                            logger.info(f"Filed issue: {issue_url}")
+                            log_broadcast(f"[REPORT] Action completed: {issue_url}")
                             results["issues_filed"] += 1
-                        else:
-                            logger.info("Issue threshold not met, skipping")
                         
-                        # Step 5: Mint on-chain receipt
-                        logger.info(f"[5/5] Minting on-chain receipt...")
+                        # Step 5: Receipt
+                        log_broadcast("[RECEIPT] Minting on-chain receipt...")
                         receipt = record_receipt(
                             audit_hash=report.audit_hash,
                             repo_name=report.repo_name,
@@ -177,58 +178,88 @@ class AuditAgent:
                         )
                         
                         if receipt.get("success"):
-                            logger.info(f"Receipt minted: {receipt.get('transaction_hash')}")
+                            tx_hash = receipt.get("transaction_hash", "")
+                            log_broadcast(f"[RECEIPT] Receipt minted: {tx_hash[:20]}...")
                             results["receipts_minted"] += 1
                         else:
-                            logger.warning(f"Receipt failed: {receipt.get('error')}")
-                            results["errors"].append({
-                                "repo": repo['name'],
-                                "stage": "receipt",
-                                "error": receipt.get("error")
-                            })
+                            log_broadcast(f"[WARNING] Receipt failed: {receipt.get('error')}")
+                    else:
+                        # No critical/high - still save the audit
+                        issue_url = None
+                        receipt = {"success": False}
+                    
+                    # Save audit record
+                    try:
+                        severity = SeverityBreakdown(
+                            critical=report.critical_count,
+                            high=report.high_count,
+                            medium=report.medium_count,
+                            low=report.low_count,
+                            informational=len([f for f in report.findings if f.get("severity", "").lower() == "informational"])
+                        )
+                        audit_record = AuditRecord(
+                            id=report.audit_hash,
+                            repo=report.repo_name,
+                            timestamp=report.timestamp,
+                            severity_summary=severity,
+                            github_issue_url=issue_url,
+                            receipt_tx_hash=receipt.get("transaction_hash") if receipt.get("success") else None,
+                            summary=report.summary,
+                            findings=report.findings,
+                            status="completed"
+                        )
+                        storage.save_audit(audit_record)
+                        log_broadcast(f"[DISCOVERY] Audit saved: {report.audit_hash}")
+                    except Exception as save_err:
+                        log_broadcast(f"[ERROR] Failed to save audit: {save_err}")
                     
                 except Exception as e:
-                    logger.error(f"Error auditing {repo['name']}: {e}")
+                    log_broadcast(f"[ERROR] Error auditing {repo.get('name')}: {e}")
                     results["errors"].append({
-                        "repo": repo['name'],
+                        "repo": repo.get("name"),
                         "error": str(e)
                     })
                     continue
             
         except Exception as e:
-            logger.error(f"Critical error in audit cycle: {e}")
+            log_broadcast(f"[ERROR] Critical error in audit cycle: {e}")
             results["errors"].append({"cycle_error": str(e)})
         
         cycle_end = datetime.now()
         results["cycle_end"] = cycle_end.isoformat()
         results["duration_seconds"] = (cycle_end - cycle_start).total_seconds()
         
-        logger.info("=" * 50)
-        logger.info(f"Audit cycle complete in {results['duration_seconds']:.1f}s")
-        logger.info(f"Scanned: {results['repos_scanned']}, "
-                    f"Issues: {results['issues_filed']}, "
-                    f"Receipts: {results['receipts_minted']}")
-        logger.info("=" * 50)
+        log_broadcast(f"[DONE] Audit complete: {results['repos_scanned']} scanned, {results['issues_filed']} actions, {results['receipts_minted']} receipts")
         
         return results
     
     def run_continuously(self):
         """Run audit cycles on a schedule."""
-        # Run immediately on start
         self.run_audit_cycle()
         
-        # Schedule subsequent runs
         schedule.every(self.interval_hours).hours.do(self.run_audit_cycle)
         
         logger.info(f"Next audit in {self.interval_hours} hours")
         
         while True:
             schedule.run_pending()
-            time.sleep(60)  # Check every minute
+            time.sleep(60)
     
-    def run_once(self):
-        """Run a single audit cycle (no scheduling)."""
-        return self.run_audit_cycle()
+    def run_once(self, repo_override: str = None):
+        """Run a single audit cycle."""
+        return self.run_audit_cycle(repo_override=repo_override)
+
+
+def log_broadcast(message: str):
+    """Log and broadcast to WebSocket if available."""
+    logger.info(message)
+    
+    # Try to import and use broadcast_log from server
+    try:
+        from api.server import broadcast_log
+        broadcast_log(message)
+    except ImportError:
+        pass  # Server not running
 
 
 def start_api_server():
@@ -242,19 +273,17 @@ def start_api_server():
 
 def main():
     """Main entry point."""
-    # Load environment variables
     github_token = os.environ.get("GITHUB_TOKEN")
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
     synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
     
-    # Start API server if RUN_API=true (Railway)
+    # Start API server if RUN_API=true
     if os.environ.get("RUN_API", "false").lower() == "true":
         from threading import Thread
         api_thread = Thread(target=start_api_server, daemon=True)
         api_thread.start()
         logging.info("FastAPI server started on port {}".format(os.environ.get("PORT", 8000)))
     
-    # Check required variables
     missing = []
     if not github_token:
         missing.append("GITHUB_TOKEN")
@@ -265,18 +294,12 @@ def main():
     
     if missing:
         logger.error(f"Missing required environment variables: {', '.join(missing)}")
-        logger.info("Please set these before running:")
-        logger.info("  export GITHUB_TOKEN=your_github_token")
-        logger.info("  export ANTHROPIC_API_KEY=your_anthropic_key")
-        logger.info("  export SYNTHESIS_API_KEY=your_synthesis_key")
         sys.exit(1)
     
-    # Get configuration
     interval_hours = int(os.environ.get("AUDIT_INTERVAL_HOURS", "6"))
     max_results = int(os.environ.get("AUDIT_MAX_RESULTS", "10"))
     issue_threshold = int(os.environ.get("AUDIT_ISSUE_THRESHOLD", "1"))
     
-    # Create and run agent
     agent = AuditAgent(
         github_token=github_token,
         anthropic_api_key=anthropic_api_key,
@@ -286,7 +309,6 @@ def main():
         issue_threshold=issue_threshold
     )
     
-    # Check if running as daemon or one-shot
     if os.environ.get("AUDIT_DAEMON", "true").lower() == "true":
         agent.run_continuously()
     else:
