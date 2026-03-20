@@ -46,6 +46,32 @@ async def lifespan(app: FastAPI):
     storage.STORAGE_DIR.mkdir(exist_ok=True)
     logger.info(f"Storage directory: {storage.STORAGE_DIR}")
     
+    # Start the agent scheduler on startup (if RUN_AGENT=true)
+    if os.environ.get("RUN_AGENT", "false").lower() == "true":
+        import threading
+        from agent.main import AuditAgent
+        
+        github_token = os.environ.get("GITHUB_TOKEN")
+        anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+        synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
+        
+        if github_token and anthropic_api_key and synthesis_api_key:
+            agent = AuditAgent(
+                github_token=github_token,
+                anthropic_api_key=anthropic_api_key,
+                synthesis_api_key=synthesis_api_key,
+                interval_hours=int(os.environ.get("AUDIT_INTERVAL_HOURS", "6")),
+                max_results=int(os.environ.get("AUDIT_MAX_RESULTS", "10")),
+                issue_threshold=int(os.environ.get("AUDIT_ISSUE_THRESHOLD", "1"))
+            )
+            
+            # Start agent in background thread
+            thread = threading.Thread(target=agent.run_continuously, daemon=True)
+            thread.start()
+            logger.info("AuditAgent scheduler started")
+        else:
+            logger.warning("Missing env vars - agent not started")
+    
     yield
     
     logger.info("AuditAgent API shutting down...")
