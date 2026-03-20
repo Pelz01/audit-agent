@@ -231,12 +231,28 @@ class AuditAgent:
         return self.run_audit_cycle()
 
 
+def start_api_server():
+    """Start the FastAPI server."""
+    import uvicorn
+    from api.server import app
+    
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
 def main():
     """Main entry point."""
     # Load environment variables
     github_token = os.environ.get("GITHUB_TOKEN")
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
     synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
+    
+    # Start API server if RUN_API=true (Railway)
+    if os.environ.get("RUN_API", "false").lower() == "true":
+        from threading import Thread
+        api_thread = Thread(target=start_api_server, daemon=True)
+        api_thread.start()
+        logging.info("FastAPI server started on port {}".format(os.environ.get("PORT", 8000)))
     
     # Check required variables
     missing = []

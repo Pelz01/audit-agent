@@ -6,3 +6,4 @@ uvicorn
 schedule
 requests
 python-dotenv
+pydantic

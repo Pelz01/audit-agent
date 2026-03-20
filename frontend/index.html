@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuditAgent Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117; 
+            color: #e6edf3; 
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 30px;
+        }
+        h1 { font-size: 1.8rem; font-weight: 600; }
+        .logo { color: #58a6ff; }
+        .refresh-indicator { 
+            font-size: 0.85rem; 
+            color: #8b949e; 
+        }
+        
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+        .stat-value { 
+            font-size: 2.5rem; 
+            font-weight: 700;
+            color: #58a6ff;
+        }
+        .stat-label { 
+            font-size: 0.9rem; 
+            color: #8b949e; 
+            margin-top: 8px;
+        }
+        
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .audits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .audit-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .audit-card:hover {
+            transform: translateY(-2px);
+            border-color: #58a6ff;
+        }
+        
+        .audit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .repo-name { 
+            font-size: 1.1rem; 
+            font-weight: 600;
+            color: #58a6ff;
+            word-break: break-all;
+        }
+        .audit-time { 
+            font-size: 0.8rem; 
+            color: #8b949e;
+            white-space: nowrap;
+            margin-left: 10px;
+        }
+        
+        .severity-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-critical { background: #da3633; color: #fff; }
+        .badge-high { background: #f85149; color: #fff; }
+        .badge-medium { background: #d29922; color: #000; }
+        .badge-low { background: #3fb950; color: #fff; }
+        .badge-info { background: #8b949e; color: #fff; }
+        
+        .audit-links {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .link-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .link-github {
+            background: #238636;
+            color: #fff;
+        }
+        .link-github:hover { background: #2ea043; }
+        .link-tx {
+            background: #1f6feb;
+            color: #fff;
+        }
+        .link-tx:hover { background: #388bfd; }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b949e;
+        }
+        .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+            color: #8b949e;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .audits-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span class="logo">🔍</span> AuditAgent</h1>
+            <span class="refresh-indicator">Auto-refresh: 60s</span>
+        </header>
+        
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="totalAudits">-</div>
+                <div class="stat-label">Total Audits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalVulns">-</div>
+                <div class="stat-label">Vulnerabilities Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="issuesFiled">-</div>
+                <div class="stat-label">Issues Filed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="receiptsMinted">-</div>
+                <div class="stat-label">Receipts Minted</div>
+            </div>
+        </div>
+        
+        <div class="section-title">
+            <span>Recent Audits</span>
+        </div>
+        
+        <div id="auditsContainer">
+            <div class="loading">Loading audits...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        
+        async function fetchStats() {
+            try {
+                const res = await fetch(`${API_BASE}/stats`);
+                const stats = await res.json();
+                
+                document.getElementById('totalAudits').textContent = stats.total_audits || 0;
+                document.getElementById('totalVulns').textContent = stats.total_vulnerabilities || 0;
+                document.getElementById('issuesFiled').textContent = stats.issues_filed || 0;
+                document.getElementById('receiptsMinted').textContent = stats.receipts_minted || 0;
+            } catch (e) {
+                console.error('Failed to fetch stats:', e);
+            }
+        }
+        
+        async function fetchAudits() {
+            try {
+                const res = await fetch(`${API_BASE}/audits?page=1&page_size=20`);
+                const data = await res.json();
+                
+                const container = document.getElementById('auditsContainer');
+                
+                if (!data.audits || data.audits.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-icon">📋</div>
+                            <p>No audits yet. The agent is scanning repos...</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="audits-grid">
+                        ${data.audits.map(audit => renderAuditCard(audit)).join('')}
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Failed to fetch audits:', e);
+                document.getElementById('auditsContainer').innerHTML = `
+                    <div class="empty-state">
+                        <p>Failed to load audits. API may be unavailable.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderAuditCard(audit) {
+            const s = audit.severity_summary || {};
+            const time = new Date(audit.timestamp).toLocaleString();
+            
+            let badges = '';
+            if (s.critical) badges += `<span class="badge badge-critical">${s.critical} Critical</span>`;
+            if (s.high) badges += `<span class="badge badge-high">${s.high} High</span>`;
+            if (s.medium) badges += `<span class="badge badge-medium">${s.medium} Medium</span>`;
+            if (s.low) badges += `<span class="badge badge-low">${s.low} Low</span>`;
+            if (s.informational) badges += `<span class="badge badge-info">${s.informational} Info</span>`;
+            if (!badges) badges = '<span class="badge badge-info">No issues</span>';
+            
+            let links = '';
+            if (audit.github_issue_url) {
+                links += `<a href="${audit.github_issue_url}" target="_blank" class="link-btn link-github">GitHub Issue</a>`;
+            }
+            if (audit.receipt_tx_hash) {
+                const baseScanUrl = `https://basescan.org/tx/${audit.receipt_tx_hash}`;
+                links += `<a href="${baseScanUrl}" target="_blank" class="link-btn link-tx">Receipt</a>`;
+            }
+            
+            return `
+                <div class="audit-card">
+                    <div class="audit-header">
+                        <span class="repo-name">${audit.repo}</span>
+                        <span class="audit-time">${time}</span>
+                    </div>
+                    <div class="severity-badges">${badges}</div>
+                    <div class="audit-links">${links}</div>
+                </div>
+            `;
+        }
+        
+        async function init() {
+            await fetchStats();
+            await fetchAudits();
+        }
+        
+        // Auto-refresh every 60 seconds
+        init();
+        setInterval(() => {
+            fetchStats();
+            fetchAudits();
+        }, 60000);
+    </script>
+</body>
+</html>
