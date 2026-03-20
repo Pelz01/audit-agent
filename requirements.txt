@@ -1,0 +1,8 @@
+slither-analyzer
+anthropic
+PyGithub
+fastapi
+uvicorn
+schedule
+requests
+python-dotenv
