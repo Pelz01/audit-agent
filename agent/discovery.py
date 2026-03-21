@@ -50,11 +50,8 @@ def discover_solidity_repos(
 
     g = Github(token)
     
-    # Calculate date filter
-    date_filter = (datetime.now() - timedelta(days=days_old)).strftime("%Y-%m-%d")
-    
-    # Search for Solidity repos pushed in the last N days
-    query = f"language:solidity pushed:>={date_filter}"
+    # Search for active Solidity repos with a valid GitHub date filter.
+    query = "language:solidity pushed:>2024-01-01 stars:>2"
     
     logger.info(f"Searching for Solidity repos with query: {query}")
     
