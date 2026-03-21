@@ -14,6 +14,20 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def normalize_slither_output(slither_json: Dict) -> List[Dict]:
+    """Normalize Slither JSON into a flat list of findings."""
+    raw = slither_json.get("results", {}).get("detectors", [])
+    findings = []
+    for detector in raw:
+        findings.append({
+            "severity": detector.get("impact", "Unknown"),
+            "check": detector.get("check", ""),
+            "description": detector.get("description", ""),
+            "elements": detector.get("elements", [])
+        })
+    return findings
+
+
 def clone_repo(repo_url: str, branch: str = "main") -> str:
     """
     Clone a GitHub repository to a temporary directory.
@@ -113,17 +127,14 @@ def run_slither(repo_path: str, sol_files: List[str]) -> Dict:
             with open(output_file, "r") as f:
                 slither_output = json.load(f)
             
-            # Ensure it's in list format
-            if isinstance(slither_output, dict):
-                if "results" in slither_output:
-                    slither_output = slither_output["results"]
-                slither_output = [slither_output] if slither_output else []
+            findings = normalize_slither_output(slither_output if isinstance(slither_output, dict) else {})
             
             os.remove(output_file)
             
             return {
                 "success": True,
-                "results": slither_output,
+                "results": findings,
+                "findings": findings,
                 "files_scanned": len(sol_files),
                 "stdout": result.stdout,
                 "stderr": result.stderr
@@ -213,6 +224,7 @@ def scan_repository(repo_url: str, branch: str = "main", keep_repo: bool = False
             "repo_path": repo_path,
             "files_scanned": slither_results.get("files_scanned", 0),
             "results": slither_results.get("results", []),
+            "findings": slither_results.get("findings", slither_results.get("results", [])),
             "error": slither_results.get("error"),
             "slither_stdout": slither_results.get("stdout"),
             "slither_stderr": slither_results.get("stderr"),
@@ -247,3 +259,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     # This would require a real repo URL
     print("Scanner module loaded. Use scan_repository() to scan a repo.")
+
+
+def scan(repo_url: str, branch: str = "main", keep_repo: bool = False) -> Dict:
+    """Compatibility helper for import verification."""
+    return scan_repository(repo_url, branch=branch, keep_repo=keep_repo)

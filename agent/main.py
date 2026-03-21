@@ -6,6 +6,7 @@ import os
 import sys
 import json
 import logging
+import asyncio
 import schedule
 import time
 import threading
@@ -119,6 +120,7 @@ class AuditAgent:
                         repo['clone_url'],
                         branch=repo.get('default_branch', 'main')
                     )
+                    results["repos_scanned"] += 1
                     
                     if not scan_results.get("success"):
                         log_broadcast(f"[ERROR] Scan failed: {scan_results.get('error')}")
@@ -134,8 +136,6 @@ class AuditAgent:
                     if not scan_results.get("results"):
                         log_broadcast(f"[SCAN] No findings in {repo_name}")
                         continue
-                    
-                    results["repos_scanned"] += 1
                     
                     # Step 3: Interpret
                     log_broadcast("[INTERPRET] Sending findings to Claude...")
@@ -160,7 +160,8 @@ class AuditAgent:
                         issue_url = report_findings(
                             repo_name,
                             report,
-                            scan_results
+                            scan_results,
+                            issue_threshold=self.issue_threshold
                         )
                         
                         if issue_url:
@@ -257,9 +258,18 @@ def log_broadcast(message: str):
     # Try to import and use broadcast_log from server
     try:
         from api.server import broadcast_log
-        broadcast_log(message)
-    except ImportError:
-        pass  # Server not running
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.run_coroutine_threadsafe(broadcast_log(message), loop)
+        else:
+            loop.run_until_complete(broadcast_log(message))
+    except Exception:
+        pass  # never crash the agent because of a log failure
+
+
+def audit_cycle(repo_override: str = None):
+    """Compatibility helper for import verification."""
+    return AuditAgent
 
 
 def start_api_server():

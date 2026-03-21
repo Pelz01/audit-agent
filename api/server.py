@@ -15,7 +15,7 @@ from collections import deque
 from datetime import datetime
 
 from fastapi import FastAPI, Query, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import (
@@ -123,7 +123,7 @@ async def audit_worker():
             repo = await audit_queue.get()
             await broadcast_log(f"[QUEUED] Starting audit for {repo}")
             agent.run_once(repo_override=repo)
-            await audit_queue.task_done()
+            audit_queue.task_done()
         except Exception as e:
             await broadcast_log(f"[ERROR] Audit worker error: {e}")
             await asyncio.sleep(1)
@@ -226,10 +226,13 @@ async def submit_audit(request: dict):
             headers={"Accept": "application/vnd.github.v3+json"},
             timeout=10
         )
-        if response.status_code == 404:
-            raise HTTPException(status_code=400, detail="Repository not found")
-    except Exception as e:
+    except requests.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to validate repository: {str(e)}")
+
+    if response.status_code == 404:
+        raise HTTPException(status_code=400, detail="Repository not found")
+    if response.status_code >= 400:
+        raise HTTPException(status_code=400, detail=f"GitHub validation failed with status {response.status_code}")
     
     # Check for Solidity files
     try:
@@ -301,7 +304,7 @@ async def favicon():
 async def global_exception_handler(request, exc):
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
-    raise HTTPException(status_code=500, detail="Internal server error")
+    return JSONResponse(status_code=500, content={"error": str(exc)})
 
 
 if __name__ == "__main__":

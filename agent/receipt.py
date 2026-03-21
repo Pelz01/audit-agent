@@ -13,7 +13,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # Synthesis API endpoint
-SYNTHESIS_API_BASE = "https://api.synthesis.gg/v1"
+SYNTHESIS_API_BASE = "https://synthesis.devfolio.co"
 SYNTHESIS_API_KEY = os.environ.get("SYNTHESIS_API_KEY")
 
 
@@ -45,14 +45,21 @@ def mint_receipt(
     if not api_key:
         raise ValueError("SYNTHESIS_API_KEY not set")
     
+    severity_payload = {
+        "critical": severity_summary.get("critical", 0),
+        "high": severity_summary.get("high", 0),
+        "medium": severity_summary.get("medium", 0),
+        "low": severity_summary.get("low", 0)
+    }
+
     # Prepare payload
     payload = {
-        "audit_hash": audit_hash,
-        "repo_name": repo_name,
+        "auditHash": audit_hash,
+        "repository": repo_name,
         "timestamp": timestamp,
-        "severity_summary": severity_summary,
-        "github_issue_url": github_issue_url,
-        "chain_id": 1,  # Ethereum mainnet
+        "severity": severity_payload,
+        "issueUrl": github_issue_url,
+        "agentName": "AuditAgent"
     }
     
     headers = {
@@ -64,7 +71,7 @@ def mint_receipt(
     
     try:
         response = requests.post(
-            f"{SYNTHESIS_API_BASE}/erc8004/mint",
+            f"{SYNTHESIS_API_BASE}/receipts/mint",
             json=payload,
             headers=headers,
             timeout=30
@@ -164,7 +171,7 @@ def check_receipt_status(audit_hash: str, api_key: Optional[str] = None) -> Dict
     
     try:
         response = requests.get(
-            f"{SYNTHESIS_API_BASE}/erc8004/receipt/{audit_hash}",
+            f"{SYNTHESIS_API_BASE}/receipts/{audit_hash}",
             headers=headers,
             timeout=10
         )
@@ -198,3 +205,22 @@ if __name__ == "__main__":
         print(json.dumps(result, indent=2))
     else:
         print("SYNTHESIS_API_KEY not set")
+
+
+def mint(
+    audit_hash: str,
+    repo_name: str,
+    timestamp: str,
+    severity_summary: Dict[str, int],
+    github_issue_url: Optional[str] = None,
+    api_key: Optional[str] = None
+) -> Dict:
+    """Compatibility helper for import verification."""
+    return mint_receipt(
+        audit_hash=audit_hash,
+        repo_name=repo_name,
+        timestamp=timestamp,
+        severity_summary=severity_summary,
+        github_issue_url=github_issue_url,
+        api_key=api_key
+    )

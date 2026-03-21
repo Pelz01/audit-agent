@@ -7,16 +7,16 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from github import Github
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SEEN_REPOS_FILE = "agent/seen_repos.json"
+SEEN_REPOS_FILE = Path(__file__).parent.parent / "audits" / "seen_repos.json"
 
 
 def load_seen_repos() -> set:
     """Load previously seen repository IDs from file."""
-    if os.path.exists(SEEN_REPOS_FILE):
+    if SEEN_REPOS_FILE.exists():
         with open(SEEN_REPOS_FILE, "r") as f:
             data = json.load(f)
             return set(data.get("seen_ids", []))
@@ -25,6 +25,7 @@ def load_seen_repos() -> set:
 
 def save_seen_repos(seen_ids: set) -> None:
     """Save seen repository IDs to file."""
+    SEEN_REPOS_FILE.parent.mkdir(exist_ok=True)
     with open(SEEN_REPOS_FILE, "w") as f:
         json.dump({"seen_ids": list(seen_ids)}, f)
 
@@ -45,6 +46,8 @@ def discover_solidity_repos(
     Returns:
         List of dicts with repo info (id, name, url, stars, description)
     """
+    from github import Github
+
     g = Github(token)
     
     # Calculate date filter
@@ -65,12 +68,21 @@ def discover_solidity_repos(
             # Skip if we've already seen this repo
             if repo.id in seen_ids:
                 continue
+            if repo.fork:
+                continue
+            if repo.archived:
+                continue
+            if (repo.size or 0) <= 0:
+                continue
                 
             repo_info = {
                 "id": repo.id,
                 "name": repo.full_name,
                 "url": repo.html_url,
                 "clone_url": repo.clone_url,
+                "fork": repo.fork,
+                "archived": repo.archived,
+                "size": repo.size,
                 "description": repo.description or "",
                 "stars": repo.stargazers_count,
                 "forks": repo.forks_count,

@@ -9,8 +9,6 @@ import time
 import requests
 from typing import Optional, Dict, List, Any
 from datetime import datetime
-from github import Github
-from github.Issue import Issue
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +30,8 @@ def get_github_headers() -> Dict[str, str]:
 
 def get_github_username() -> str:
     """Get the authenticated user's username."""
+    from github import Github
+
     token = os.environ.get("GITHUB_TOKEN")
     g = Github(token)
     return g.get_user().login
@@ -137,7 +137,7 @@ def fork_repository(owner: str, repo: str) -> Optional[str]:
         time.sleep(3)  # Wait for fork to be ready
         username = get_github_username()
         return f"{username}/{repo}"
-    elif response.status_code == 202:  # Already forked
+    elif response.status_code == 422:  # Already forked
         username = get_github_username()
         return f"{username}/{repo}"
     
@@ -157,10 +157,27 @@ def create_branch(owner: str, repo: str, branch_name: str, base_sha: str) -> boo
 
 
 def get_default_branch_sha(owner: str, repo: str) -> Optional[str]:
-    """Get SHA of the default branch."""
+    """Get the commit SHA of the repository's default branch."""
     url = f"{GITHUB_API}/repos/{owner}/{repo}"
     response = requests.get(url, headers=get_github_headers())
     
+    if response.status_code == 200:
+        default_branch = response.json().get("default_branch")
+        if not default_branch:
+            return None
+
+        ref_url = f"{GITHUB_API}/repos/{owner}/{repo}/git/ref/heads/{default_branch}"
+        ref_response = requests.get(ref_url, headers=get_github_headers())
+        if ref_response.status_code == 200:
+            return ref_response.json().get("object", {}).get("sha")
+    return None
+
+
+def get_default_branch_name(owner: str, repo: str) -> Optional[str]:
+    """Get the repository's default branch name."""
+    url = f"{GITHUB_API}/repos/{owner}/{repo}"
+    response = requests.get(url, headers=get_github_headers())
+
     if response.status_code == 200:
         return response.json().get("default_branch")
     return None
@@ -193,7 +210,7 @@ def open_pull_request(
     head_branch: str,
     title: str,
     body: str,
-    base_branch: str = "main"
+    base_branch: str
 ) -> Optional[str]:
     """Open a pull request."""
     url = f"{GITHUB_API}/repos/{owner}/{repo}/pulls"
@@ -226,6 +243,8 @@ def file_github_issue(
     threshold: int = DEFAULT_THRESHOLD
 ) -> Optional[str]:
     """File a GitHub issue (non-critical flow)."""
+    from github import Github
+
     g = Github(token)
     
     try:
@@ -400,6 +419,11 @@ def handle_critical(
     if not base_sha:
         logger.error("Failed to get default branch SHA")
         return None
+
+    default_branch = get_default_branch_name(owner, repo)
+    if not default_branch:
+        logger.error("Failed to get default branch name")
+        return None
     
     # Create branch
     timestamp = datetime.now().strftime("%Y%m%d%H%M")
@@ -448,7 +472,8 @@ Generated a fix to address the {vuln_type} vulnerability using checks-effects-in
         owner, repo,
         f"{username}:{branch_name}",
         pr_title,
-        pr_body
+        pr_body,
+        base_branch=default_branch
     )
     
     if pr_url:
@@ -476,6 +501,8 @@ A Critical security vulnerability has been found in this repository during an au
 """
     
     try:
+        from github import Github
+
         g = Github(token)
         original_repo = g.get_repo(repo_full_name)
         issue = original_repo.create_issue(
@@ -503,7 +530,8 @@ def handle_non_critical(repo_full_name: str, audit_report) -> Optional[str]:
 def report_findings(
     repo_full_name: str,
     audit_report,
-    scan_findings: Dict = None
+    scan_findings: Dict = None,
+    issue_threshold: int = DEFAULT_THRESHOLD
 ) -> Optional[str]:
     """
     Main entry point for reporting findings.
@@ -536,7 +564,7 @@ def report_findings(
     if critical_count > 0:
         logger.info(f"Critical contract findings detected for {repo_full_name}")
         return handle_critical(repo_full_name, audit_report, scan_findings or {})
-    elif high_count > 0 or medium_count > 0 or (has_secrets and not critical_count):
+    elif (high_count + medium_count) >= issue_threshold or (has_secrets and not critical_count):
         logger.info(f"Non-critical findings for {repo_full_name}, filing issue")
         return handle_non_critical(repo_full_name, audit_report)
     elif has_secrets:
