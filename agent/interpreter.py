@@ -1,18 +1,20 @@
 """
 Interpreter module for AuditAgent.
-Sends Slither results to Claude API for analysis.
+Sends Slither results to Pollinations AI for analysis.
 """
 import os
 import json
 import logging
 import hashlib
+import re
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 from datetime import datetime
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
-# System prompt for Claude to act as a senior security auditor
+# System prompt for Pollinations to act as a senior security auditor
 SYSTEM_PROMPT = """You are a senior smart contract security auditor with 10+ years of experience in DeFi security. 
 Your role is to analyze static analysis findings from Slither and provide a structured, actionable security report.
 
@@ -47,6 +49,17 @@ Your output must be a structured JSON report with the following fields:
   - recommendation: Remediation steps
 
 Be thorough but concise. Only output valid JSON, no additional text."""
+
+
+def get_pollinations_client() -> OpenAI:
+    """Create a Pollinations client on demand."""
+    api_key = os.environ.get("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY environment variable not set")
+    return OpenAI(
+        base_url="https://gen.pollinations.ai",
+        api_key=api_key
+    )
 
 
 @dataclass
@@ -119,36 +132,16 @@ def generate_audit_hash(repo_name: str, timestamp: str, findings: List) -> str:
     return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 
-def call_claude_api(slither_results: Dict, repo_name: str, api_key: str, secret_findings: List = None) -> AuditReport:
-    """
-    Send Slither results to Claude API for interpretation.
-    
-    Args:
-        slither_results: Raw Slither JSON output
-        repo_name: Name of the repository
-        api_key: Anthropic API key
-        secret_findings: List of secret scanner findings
-        
-    Returns:
-        Structured AuditReport
-    """
-    try:
-        import anthropic
-    except ImportError:
-        raise ImportError("anthropic package not installed. Run: pip install anthropic")
-    
-    timestamp = datetime.utcnow().isoformat() + "Z"
-    
-    # Build the user message
-    user_message = f"""Analyze the following Slither static analysis results for repository: {repo_name}
+def build_prompt(repo_name: str, slither_findings: Dict, secret_findings: List = None) -> str:
+    """Build the prompt sent to Pollinations."""
+    prompt = f"""Analyze the following Slither static analysis results for repository: {repo_name}
 
 Slither Results:
-{json.dumps(slither_results, indent=2)}
+{json.dumps(slither_findings, indent=2)}
 """
-    
-    # Add secret findings if present
+
     if secret_findings:
-        user_message += f"""
+        prompt += f"""
 
 Additionally, the following secret exposure findings were detected in non-contract files:
 
@@ -157,73 +150,44 @@ Additionally, the following secret exposure findings were detected in non-contra
 Include these in your report under a separate "Secret Exposures" section. Treat CRITICAL secret findings with the same urgency as CRITICAL smart contract vulnerabilities. These require immediate action.
 """
 
-    user_message += "\n\nProvide a structured security audit report in JSON format."
+    prompt += "\n\nProvide a structured security audit report in JSON format."
+    return prompt
 
-    logger.info(f"Sending {len(slither_results.get('results', []))} findings to Claude API")
-    
+
+def parse_response(content: str) -> Dict:
+    """Parse a JSON response, including fenced or embedded JSON."""
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8000,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": user_message}
-            ]
-        )
-        
-        # Parse the JSON response
-        response_text = response.content[0].text
-        
-        # Try to extract JSON from response
-        try:
-            report_data = json.loads(response_text)
-        except json.JSONDecodeError:
-            # Try to find JSON in the response
-            import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                report_data = json.loads(json_match.group())
-            else:
-                raise ValueError("Could not parse JSON from Claude response")
-        
-        # Ensure required fields
-        report_data["repo_name"] = repo_name
-        report_data["timestamp"] = timestamp
-        if "audit_hash" not in report_data:
-            report_data["audit_hash"] = generate_audit_hash(
-                repo_name, 
-                timestamp, 
-                report_data.get("findings", [])
-            )
-        
-        # Ensure severity_breakdown exists
-        if "severity_breakdown" not in report_data:
-            report_data["severity_breakdown"] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
-            for finding in report_data.get("findings", []):
-                sev = finding.get("severity", "informational").lower()
-                if sev in report_data["severity_breakdown"]:
-                    report_data["severity_breakdown"][sev] += 1
-        
-        return AuditReport(**report_data)
-        
-    except Exception as e:
-        logger.error(f"Claude API error: {e}")
-        # Return a minimal report on error
-        return AuditReport(
-            audit_hash=generate_audit_hash(repo_name, timestamp, []),
-            repo_name=repo_name,
-            timestamp=timestamp,
-            summary=f"Failed to analyze with Claude: {str(e)}",
-            severity_breakdown={"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0},
-            findings=[]
-        )
+        return json.loads(content)
+    except json.JSONDecodeError:
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+        raise ValueError("Could not parse JSON from Pollinations response")
+
+
+def interpret(repo_name: str, slither_findings: Dict, extra_findings: List = None) -> Dict:
+    """Interpret findings using Pollinations' OpenAI-compatible API."""
+    client = get_pollinations_client()
+    response = client.chat.completions.create(
+        model="qwen-coder",
+        messages=[
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+            },
+            {
+                "role": "user",
+                "content": build_prompt(repo_name, slither_findings, extra_findings or [])
+            }
+        ],
+        response_format={"type": "json_object"}
+    )
+    return parse_response(response.choices[0].message.content)
 
 
 def interpret_results(slither_results: Dict, repo_name: str, secret_findings: List = None) -> AuditReport:
     """
-    Interpret Slither results using Claude API.
+    Interpret Slither results using Pollinations AI.
     
     Args:
         slither_results: Raw Slither JSON output
@@ -233,12 +197,39 @@ def interpret_results(slither_results: Dict, repo_name: str, secret_findings: Li
     Returns:
         Structured AuditReport
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-    
-    return call_claude_api(slither_results, repo_name, api_key, secret_findings)
+    timestamp = datetime.utcnow().isoformat() + "Z"
+
+    logger.info(f"Sending {len(slither_results.get('findings', []))} findings to Pollinations AI")
+
+    try:
+        report_data = interpret(repo_name, slither_results, secret_findings or [])
+        report_data["repo_name"] = repo_name
+        report_data["timestamp"] = timestamp
+        if "audit_hash" not in report_data:
+            report_data["audit_hash"] = generate_audit_hash(
+                repo_name,
+                timestamp,
+                report_data.get("findings", [])
+            )
+
+        if "severity_breakdown" not in report_data:
+            report_data["severity_breakdown"] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
+            for finding in report_data.get("findings", []):
+                sev = finding.get("severity", "informational").lower()
+                if sev in report_data["severity_breakdown"]:
+                    report_data["severity_breakdown"][sev] += 1
+
+        return AuditReport(**report_data)
+    except Exception as e:
+        logger.error(f"Pollinations API error: {e}")
+        return AuditReport(
+            audit_hash=generate_audit_hash(repo_name, timestamp, []),
+            repo_name=repo_name,
+            timestamp=timestamp,
+            summary=f"Failed to analyze with Pollinations: {str(e)}",
+            severity_breakdown={"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0},
+            findings=[]
+        )
 
 
 if __name__ == "__main__":
@@ -265,9 +256,9 @@ if __name__ == "__main__":
         ]
     }
     
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("POLLINATIONS_API_KEY")
     if api_key:
         report = interpret_results(sample_results, "test/repo")
         print(json.dumps(report.to_dict(), indent=2))
     else:
-        print("ANTHROPIC_API_KEY not set")
+        print("POLLINATIONS_API_KEY not set")

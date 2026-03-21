@@ -1,12 +1,12 @@
 # AuditAgent 🤖
 
-Autonomous smart contract security scanner that hunts for unaudited Solidity repos, scans them with Slither, interprets findings via Claude, files GitHub Issues, and mints on-chain ERC-8004 receipts.
+Autonomous smart contract security scanner that hunts for unaudited Solidity repos, scans them with Slither, interprets findings via Pollinations AI, files GitHub Issues, and mints on-chain ERC-8004 receipts.
 
 ## Features
 
 - **Auto-Discovery**: Finds unaudited Solidity repositories on GitHub
 - **Slither Scanning**: Static analysis from Trail of Bits
-- **AI Interpretation**: Claude (Anthropic) generates human-readable reports
+- **AI Interpretation**: Pollinations AI (`qwen-coder`) generates human-readable reports
 - **Issue Filing**: Automatically files security issues on GitHub
 - **On-Chain Receipts**: ERC-8004 tokens on Base via Synthesis API
 - **Dashboard**: Real-time stats and audit history
@@ -18,7 +18,7 @@ audit-agent/
 ├── agent/           # Autonomous agent modules
 │   ├── discovery.py    # GitHub API search
 │   ├── scanner.py      # Slither integration
-│   ├── interpreter.py  # Claude analysis
+│   ├── interpreter.py  # Pollinations analysis
 │   ├── reporter.py     # GitHub Issues
 │   ├── receipt.py      # ERC-8004 minting
 │   └── main.py         # Orchestrator
@@ -36,7 +36,7 @@ audit-agent/
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `GITHUB_TOKEN` | Yes | GitHub PAT with `repo` scope |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude |
+| `POLLINATIONS_API_KEY` | Yes | Pollinations AI API key |
 | `SYNTHESIS_API_KEY` | Yes | Synthesis API key for ERC-8004 |
 | `PORT` | No | Server port (default: 8000) |
 | `RUN_API` | No | Set `true` to start API server |
@@ -55,7 +55,7 @@ pip install -r requirements.txt
 
 # Set environment variables
 export GITHUB_TOKEN=ghp_xxx
-export ANTHROPIC_API_KEY=sk-ant-xxx
+export POLLINATIONS_API_KEY=pollinations-xxx
 export SYNTHESIS_API_KEY=sk-synth-xxx
 
 # Run agent only
@@ -84,7 +84,7 @@ python -m agent.main
 1. **Show Dashboard** — Visit deployed URL, show audit history
 2. **Trigger Live Audit** — Run `python -m agent.main` on a test repo
 3. **Show Slither Running** — Terminal output with findings
-4. **Show Claude Report** — Generated security analysis
+4. **Show AI Report** — Generated security analysis
 5. **Show GitHub Issue** — Link to filed issue
 6. **Show On-Chain Receipt** — BaseScan transaction link
 
@@ -108,7 +108,7 @@ python -m agent.main
 
 - **Agent**: Python 3.11+
 - **Scanner**: Slither (Trail of Bits)
-- **AI**: Claude (Anthropic)
+- **AI**: Pollinations AI (`qwen-coder`)
 - **On-Chain**: ERC-8004 / Synthesis API (Base)
 - **Backend**: FastAPI + Uvicorn
 - **Storage**: JSON files (no DB)

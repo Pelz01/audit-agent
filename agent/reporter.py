@@ -9,8 +9,21 @@ import time
 import requests
 from typing import Optional, Dict, List, Any
 from datetime import datetime
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
+
+
+
+def get_pollinations_client() -> OpenAI:
+    """Create a Pollinations client on demand."""
+    api_key = os.environ.get("POLLINATIONS_API_KEY")
+    if not api_key:
+        raise ValueError("POLLINATIONS_API_KEY not set")
+    return OpenAI(
+        base_url="https://gen.pollinations.ai",
+        api_key=api_key
+    )
 
 DEFAULT_THRESHOLD = 1
 
@@ -74,22 +87,15 @@ def fetch_file_content(owner: str, repo: str, file_path: str) -> Optional[Dict]:
     return None
 
 
-def ask_claude_for_fix(
+def ask_pollinations_for_fix(
     file_content: str,
     vulnerability_desc: str,
     function_name: str,
     file_path: str
 ) -> Optional[str]:
-    """Ask Claude to generate a fix for the vulnerability."""
-    try:
-        import anthropic
-    except ImportError:
-        logger.error("anthropic package not installed")
-        return None
-    
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        logger.error("ANTHROPIC_API_KEY not set")
+    """Ask Pollinations to generate a fix for the vulnerability."""
+    if not os.environ.get("POLLINATIONS_API_KEY"):
+        logger.error("POLLINATIONS_API_KEY not set")
         return None
     
     system_prompt = """You are a smart contract security engineer. You fix Solidity vulnerabilities precisely and minimally. You only change what is necessary to fix the vulnerability. You do not refactor, rename, or restructure anything else. Your fix must be production-safe."""
@@ -105,15 +111,15 @@ Original file content:
 Return ONLY the complete fixed file content. No explanation. No markdown. No code fences. Just the raw Solidity code."""
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
+        response = get_pollinations_client().chat.completions.create(
+            model="qwen-coder",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
         )
         
-        fixed_content = response.content[0].text
+        fixed_content = response.choices[0].message.content
         
         # Remove code fences if present
         if "```" in fixed_content:
@@ -124,7 +130,7 @@ Return ONLY the complete fixed file content. No explanation. No markdown. No cod
         return fixed_content
         
     except Exception as e:
-        logger.error(f"Claude API error: {e}")
+        logger.error(f"Pollinations API error: {e}")
         return None
 
 
@@ -391,9 +397,9 @@ def handle_critical(
         logger.error("Failed to fetch file content, falling back to issue")
         return None
     
-    # Ask Claude for fix
-    logger.info(f"[REPORT] Generating fix with Claude for {vuln_type}...")
-    fixed_content = ask_claude_for_fix(
+    # Ask Pollinations for fix
+    logger.info(f"[REPORT] Generating fix with Pollinations for {vuln_type}...")
+    fixed_content = ask_pollinations_for_fix(
         file_data["content"],
         vuln.get("description", ""),
         function_name,

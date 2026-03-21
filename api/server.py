@@ -73,13 +73,13 @@ async def lifespan(app: FastAPI):
         from agent.main import AuditAgent
         
         github_token = os.environ.get("GITHUB_TOKEN")
-        anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+        pollinations_api_key = os.environ.get("POLLINATIONS_API_KEY")
         synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
         
-        if github_token and anthropic_api_key and synthesis_api_key:
+        if github_token and pollinations_api_key and synthesis_api_key:
             agent = AuditAgent(
                 github_token=github_token,
-                anthropic_api_key=anthropic_api_key,
+                pollinations_api_key=pollinations_api_key,
                 synthesis_api_key=synthesis_api_key,
                 interval_hours=int(os.environ.get("AUDIT_INTERVAL_HOURS", "6")),
                 max_results=int(os.environ.get("AUDIT_MAX_RESULTS", "10")),
@@ -103,16 +103,16 @@ async def audit_worker():
     from agent.main import AuditAgent
     
     github_token = os.environ.get("GITHUB_TOKEN")
-    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    pollinations_api_key = os.environ.get("POLLINATIONS_API_KEY")
     synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
     
-    if not all([github_token, anthropic_api_key, synthesis_api_key]):
+    if not all([github_token, pollinations_api_key, synthesis_api_key]):
         logger.warning("Audit worker not started - missing environment variables")
         return
     
     agent = AuditAgent(
         github_token=github_token,
-        anthropic_api_key=anthropic_api_key,
+        pollinations_api_key=pollinations_api_key,
         synthesis_api_key=synthesis_api_key,
         interval_hours=6,
         max_results=10

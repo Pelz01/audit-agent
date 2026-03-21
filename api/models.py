@@ -28,7 +28,7 @@ class AuditRecord(BaseModel):
     github_issue_url: Optional[str] = Field(None, description="URL of GitHub issue if filed")
     pr_url: Optional[str] = Field(None, description="URL of PR if opened")
     receipt_tx_hash: Optional[str] = Field(None, description="On-chain receipt transaction hash")
-    summary: Optional[str] = Field(None, description="Claude-generated report summary")
+    summary: Optional[str] = Field(None, description="AI-generated report summary")
     findings: List[Dict] = Field(default_factory=list, description="Detailed findings array")
     status: str = Field(default="completed", description="Audit status: pending, completed, failed")
 

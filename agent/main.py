@@ -48,21 +48,21 @@ class AuditAgent:
     def __init__(
         self,
         github_token: str,
-        anthropic_api_key: str,
+        pollinations_api_key: str,
         synthesis_api_key: str,
         interval_hours: int = 6,
         max_results: int = 10,
         issue_threshold: int = 1
     ):
         self.github_token = github_token
-        self.anthropic_api_key = anthropic_api_key
+        self.pollinations_api_key = pollinations_api_key
         self.synthesis_api_key = synthesis_api_key
         self.interval_hours = interval_hours
         self.max_results = max_results
         self.issue_threshold = issue_threshold
         
         os.environ["GITHUB_TOKEN"] = github_token
-        os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+        os.environ["POLLINATIONS_API_KEY"] = pollinations_api_key
         os.environ["SYNTHESIS_API_KEY"] = synthesis_api_key
         
         logger.info(f"AuditAgent initialized. Running every {interval_hours} hours.")
@@ -138,7 +138,7 @@ class AuditAgent:
                         continue
                     
                     # Step 3: Interpret
-                    log_broadcast("[INTERPRET] Sending findings to Claude...")
+                    log_broadcast("[INTERPRET] Sending findings to Pollinations...")
                     report = interpret_results(scan_results, repo_name, scan_results.get("secrets", []))
                     
                     critical = report.critical_count
@@ -284,7 +284,7 @@ def start_api_server():
 def main():
     """Main entry point."""
     github_token = os.environ.get("GITHUB_TOKEN")
-    anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    pollinations_api_key = os.environ.get("POLLINATIONS_API_KEY")
     synthesis_api_key = os.environ.get("SYNTHESIS_API_KEY")
     
     # Start API server if RUN_API=true
@@ -297,8 +297,8 @@ def main():
     missing = []
     if not github_token:
         missing.append("GITHUB_TOKEN")
-    if not anthropic_api_key:
-        missing.append("ANTHROPIC_API_KEY")
+    if not pollinations_api_key:
+        missing.append("POLLINATIONS_API_KEY")
     if not synthesis_api_key:
         missing.append("SYNTHESIS_API_KEY")
     
@@ -312,7 +312,7 @@ def main():
     
     agent = AuditAgent(
         github_token=github_token,
-        anthropic_api_key=anthropic_api_key,
+        pollinations_api_key=pollinations_api_key,
         synthesis_api_key=synthesis_api_key,
         interval_hours=interval_hours,
         max_results=max_results,
