@@ -262,3 +262,7 @@ if __name__ == "__main__":
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print("POLLINATIONS_API_KEY not set")
+
+
+# Compatibility alias
+interpret = interpret_results
