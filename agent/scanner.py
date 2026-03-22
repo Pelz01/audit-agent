@@ -90,6 +90,25 @@ def find_solidity_files(repo_path: str) -> List[str]:
     return sol_files
 
 
+def detect_solc_version(repo_path: str) -> str:
+    """Detect the Solidity version required by contracts in the repo."""
+    import re
+    version_pattern = re.compile(r'pragma solidity\s+[\^~>=]*(\d+\.\d+\.\d+)')
+    versions = []
+    for sol_file in Path(repo_path).rglob("*.sol"):
+        try:
+            content = sol_file.read_text(errors='ignore')
+            matches = version_pattern.findall(content)
+            versions.extend(matches)
+        except:
+            pass
+    if not versions:
+        return "0.8.19"
+    # Return the most common version found
+    from collections import Counter
+    return Counter(versions).most_common(1)[0][0]
+
+
 def run_slither(repo_path: str, sol_files: List[str]) -> Dict:
     """
     Run Slither analysis on Solidity files.
@@ -109,6 +128,20 @@ def run_slither(repo_path: str, sol_files: List[str]) -> Dict:
     output_file = tempfile.mktemp(suffix=".json")
     
     try:
+        detected_version = detect_solc_version(repo_path)
+        # Map to nearest installed version
+        major_minor = ".".join(detected_version.split(".")[:2])
+        version_map = {
+            "0.4": "0.4.24",
+            "0.5": "0.5.17", 
+            "0.6": "0.6.12",
+            "0.7": "0.7.6",
+            "0.8": "0.8.19"
+        }
+        solc_version = version_map.get(major_minor, "0.8.19")
+        import subprocess
+        subprocess.run(["solc-select", "use", solc_version], capture_output=True)
+
         # Run Slither with JSON output
         cmd = ["slither", ".", "--json", output_file, "--disable-color", "--ignore-compile"]
         
