@@ -110,7 +110,7 @@ def run_slither(repo_path: str, sol_files: List[str]) -> Dict:
     
     try:
         # Run Slither with JSON output
-        cmd = ["slither", ".", "--json", output_file, "--disable-color"]
+        cmd = ["slither", ".", "--json", output_file, "--disable-color", "--ignore-compile"]
         
         logger.info(f"Running Slither on {len(sol_files)} files")
         
