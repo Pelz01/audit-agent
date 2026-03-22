@@ -135,6 +135,25 @@ class AuditAgent:
                     
                     if not scan_results.get("results"):
                         log_broadcast(f"[SCAN] No findings in {repo_name}")
+                        try:
+                            import hashlib
+                            from datetime import datetime
+                            audit_hash = hashlib.sha256(f"{repo_name}:{datetime.utcnow().isoformat()}".encode()).hexdigest()[:16]
+                            clean_record = AuditRecord(
+                                id=audit_hash,
+                                repo=repo_name,
+                                timestamp=datetime.utcnow(),
+                                severity_summary=SeverityBreakdown(),
+                                github_issue_url=None,
+                                receipt_tx_hash=None,
+                                summary="No vulnerabilities detected. Contract appears clean.",
+                                findings=[],
+                                status="completed"
+                            )
+                            storage.save_audit(clean_record)
+                            log_broadcast(f"[DONE] Clean audit saved: {repo_name}")
+                        except Exception as save_err:
+                            log_broadcast(f"[ERROR] Failed to save clean audit: {save_err}")
                         continue
                     
                     # Step 3: Interpret
