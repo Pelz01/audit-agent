@@ -441,6 +441,7 @@
 
     <script>
         const API_BASE = 'https://auditagent.pelz.fyi';
+        const WS_BASE = 'wss://auditagent.pelz.fyi';
         let allAudits = [];
         let ws = null;
         let userScrolledUp = false;
@@ -632,8 +633,7 @@
         
         // WebSocket terminal
         function connectWebSocket() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws/logs`;
+            const wsUrl = `${WS_BASE}/ws/logs`;
             
             try {
                 ws = new WebSocket(wsUrl);
