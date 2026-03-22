@@ -92,6 +92,8 @@ def list_audits(page: int = 1, page_size: int = 10) -> Dict:
         
         audits = []
         for file_path in page_files:
+            if file_path.name == "seen_repos.json":
+                continue
             try:
                 with open(file_path, "r") as f:
                     data = json.load(f)
@@ -136,6 +138,8 @@ def get_stats() -> AgentStats:
         last_audit_repo = None
         
         for file_path in audit_files:
+            if file_path.name == "seen_repos.json":
+                continue
             try:
                 with open(file_path, "r") as f:
                     data = json.load(f)
@@ -193,6 +197,8 @@ def get_audits_today() -> int:
         count = 0
         
         for file_path in STORAGE_DIR.glob("*.json"):
+            if file_path.name == "seen_repos.json":
+                continue
             try:
                 with open(file_path, "r") as f:
                     data = json.load(f)
@@ -223,6 +229,7 @@ def get_last_audit_time() -> Optional[str]:
             key=lambda f: f.stat().st_mtime,
             reverse=True
         )
+        audit_files = [f for f in audit_files if f.name != "seen_repos.json"]
         if audit_files:
             with open(audit_files[0], "r") as f:
                 data = json.load(f)
