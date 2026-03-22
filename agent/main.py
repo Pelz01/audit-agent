@@ -5,6 +5,7 @@ Runs the full Discover→Scan→Interpret→Act→Receipt loop on a schedule.
 import os
 import sys
 import json
+import hashlib
 import logging
 import asyncio
 import schedule
@@ -136,8 +137,6 @@ class AuditAgent:
                     if not scan_results.get("results"):
                         log_broadcast(f"[SCAN] No findings in {repo_name}")
                         try:
-                            import hashlib
-                            from datetime import datetime
                             audit_hash = hashlib.sha256(f"{repo_name}:{datetime.utcnow().isoformat()}".encode()).hexdigest()[:16]
                             clean_record = AuditRecord(
                                 id=audit_hash,
